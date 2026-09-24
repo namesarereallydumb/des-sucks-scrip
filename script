@@ -27,6 +27,99 @@ local Toggle = MainTab:CreateToggle({
 	end,
 })
 
+local ESPTab = Window:CreateTab("ESP", 0)
+
+local boxESPActive = false
+local espBoxes = {}
+local camera = workspace.CurrentCamera
+local players = game:GetService("Players")
+
+local function removeBox(userId)
+	if espBoxes[userId] then
+		espBoxes[userId]:Destroy()
+		espBoxes[userId] = nil
+	end
+end
+
+local function createBox(player)
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "BoxESP_" .. player.UserId
+	screenGui.ResetOnSpawn = false
+	screenGui.Parent = game:GetService("CoreGui")
+	
+	local box = Instance.new("Frame")
+	box.Name = "Box"
+	box.BackgroundTransparency = 1
+	box.BorderColor3 = Color3.fromRGB(255, 0, 0)
+	box.BorderSizePixel = 2
+	box.Parent = screenGui
+	
+	espBoxes[player.UserId] = screenGui
+end
+
+local function updateBoxes()
+	if not boxESPActive then return end
+	
+	for _, player in pairs(players:GetPlayers()) do
+		if player ~= players.LocalPlayer and player.Character then
+			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				if not espBoxes[player.UserId] then
+					createBox(player)
+				end
+				
+				local screenPos, onScreen = camera:WorldToScreenPoint(hrp.Position)
+				
+				if onScreen then
+					local screenGui = espBoxes[player.UserId]
+					local box = screenGui:FindFirstChild("Box")
+					local distance = (camera.Focus.Position - hrp.Position).Magnitude
+					local boxSize = math.max(50, 200 / math.max(distance / 10, 0.1))
+					
+					box.Size = UDim2.new(0, boxSize, 0, boxSize)
+					box.Position = UDim2.new(0, screenPos.X - boxSize / 2, 0, screenPos.Y - boxSize / 2)
+					screenGui.Enabled = true
+				else
+					espBoxes[player.UserId].Enabled = false
+				end
+			end
+		end
+	end
+	
+	for userId, screenGui in pairs(espBoxes) do
+		if not players:FindFirstChild(tostring(userId)) then
+			removeBox(userId)
+		end
+	end
+end
+
+players.PlayerRemoving:Connect(function(player)
+	removeBox(player.UserId)
+end)
+
+local BoxESPToggle = ESPTab:CreateToggle({
+	Name = "Box ESP",
+	CurrentValue = false,
+	Flag = "BoxESP",
+	Callback = function(Value)
+		boxESPActive = Value
+		if not boxESPActive then
+			for userId, _ in pairs(espBoxes) do
+				removeBox(userId)
+			end
+		end
+	end,
+})
+
+task.spawn(function()
+	while true do
+		if boxESPActive then
+			updateBoxes()
+		end
+		wait(0.016)
+	end
+end)
+
 local RandomTab = Window:CreateTab("Random Stuff", 0)
 
 local afkSpamActive = false
