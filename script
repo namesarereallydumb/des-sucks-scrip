@@ -33,26 +33,16 @@ local ESPTab = Window:CreateTab("ESP", 0)
 
 local boxESPActive = false
 local players = game:GetService("Players")
-local espedPlayers = {}
 
 local function getRainbowColor(hue)
 	return Color3.fromHSV(hue % 1, 1, 1)
 end
 
-local function addPlayerESP(player)
-	if player == players.LocalPlayer then return end
-	if not player.Character then return end
-	
-	if not espedPlayers[player] then
-		esplib.add_box(player.Character)
-		esplib.add_name(player.Character)
-		esplib.add_distance(player.Character)
-		espedPlayers[player] = true
-	end
-end
-
-local function removePlayerESP(player)
-	espedPlayers[player] = nil
+local function addPlayerESP(character)
+	if not character or not character.Parent then return end
+	esplib.add_box(character)
+	esplib.add_name(character)
+	esplib.add_distance(character)
 end
 
 local BoxESPToggle = ESPTab:CreateToggle({
@@ -67,26 +57,33 @@ local BoxESPToggle = ESPTab:CreateToggle({
 		
 		if boxESPActive then
 			for _, player in pairs(players:GetPlayers()) do
-				addPlayerESP(player)
+				if player ~= players.LocalPlayer and player.Character then
+					addPlayerESP(player.Character)
+				end
 			end
 		end
 	end,
 })
 
+for _, player in pairs(players:GetPlayers()) do
+	if player ~= players.LocalPlayer then
+		player.CharacterAdded:Connect(function(character)
+			if boxESPActive then
+				addPlayerESP(character)
+			end
+		end)
+		if player.Character and boxESPActive then
+			addPlayerESP(player.Character)
+		end
+	end
+end
+
 players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function()
+	player.CharacterAdded:Connect(function(character)
 		if boxESPActive then
-			addPlayerESP(player)
+			addPlayerESP(character)
 		end
 	end)
-	
-	if player.Character and boxESPActive then
-		addPlayerESP(player)
-	end
-end)
-
-players.PlayerRemoving:Connect(function(player)
-	removePlayerESP(player)
 end)
 
 task.spawn(function()
