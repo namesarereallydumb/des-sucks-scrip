@@ -102,21 +102,30 @@ end)
 
 local HumanoidTab = Window:CreateTab("Humanoid", 0)
 
+local currentSpeed = 16
+
 local SpeedSlider = HumanoidTab:CreateSlider({
 	Name = "Speed",
-	Range = {1, 999},
+	Range = {1, 200},
 	Increment = 1,
 	CurrentValue = 16,
 	Flag = "SpeedSlider",
 	Callback = function(Value)
-		if players.LocalPlayer.Character then
-			local humanoid = players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-			if humanoid then
-				humanoid.WalkSpeed = Value
-			end
-		end
+		currentSpeed = Value
 	end,
 })
+
+task.spawn(function()
+	while true do
+		if players.LocalPlayer and players.LocalPlayer.Character then
+			local humanoid = players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = currentSpeed
+			end
+		end
+		wait(0.05)
+	end
+end)
 
 local RandomTab = Window:CreateTab("Random Stuff", 0)
 
