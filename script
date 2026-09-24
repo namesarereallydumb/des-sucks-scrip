@@ -1,3 +1,5 @@
+local esplib = loadstring(game:HttpGet("https://raw.githubusercontent.com/tulontop/esp-lib.lua/refs/heads/main/source.lua"))()
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -30,72 +32,28 @@ local Toggle = MainTab:CreateToggle({
 local ESPTab = Window:CreateTab("ESP", 0)
 
 local boxESPActive = false
-local espBoxes = {}
-local camera = workspace.CurrentCamera
 local players = game:GetService("Players")
+local espedPlayers = {}
 
-local function removeBox(userId)
-	if espBoxes[userId] then
-		espBoxes[userId]:Destroy()
-		espBoxes[userId] = nil
+local function getRainbowColor(hue)
+	return Color3.fromHSV(hue % 1, 1, 1)
+end
+
+local function addPlayerESP(player)
+	if player == players.LocalPlayer then return end
+	if not player.Character then return end
+	
+	if not espedPlayers[player] then
+		esplib.add_box(player.Character)
+		esplib.add_name(player.Character)
+		esplib.add_distance(player.Character)
+		espedPlayers[player] = true
 	end
 end
 
-local function createBox(player)
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "BoxESP_" .. player.UserId
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = game:GetService("CoreGui")
-	
-	local box = Instance.new("Frame")
-	box.Name = "Box"
-	box.BackgroundTransparency = 1
-	box.BorderColor3 = Color3.fromRGB(255, 0, 0)
-	box.BorderSizePixel = 2
-	box.Parent = screenGui
-	
-	espBoxes[player.UserId] = screenGui
+local function removePlayerESP(player)
+	espedPlayers[player] = nil
 end
-
-local function updateBoxes()
-	if not boxESPActive then return end
-	
-	for _, player in pairs(players:GetPlayers()) do
-		if player ~= players.LocalPlayer and player.Character then
-			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-			if hrp then
-				if not espBoxes[player.UserId] then
-					createBox(player)
-				end
-				
-				local screenPos, onScreen = camera:WorldToScreenPoint(hrp.Position)
-				
-				if onScreen then
-					local screenGui = espBoxes[player.UserId]
-					local box = screenGui:FindFirstChild("Box")
-					local distance = (camera.Focus.Position - hrp.Position).Magnitude
-					local boxSize = math.max(50, 200 / math.max(distance / 10, 0.1))
-					
-					box.Size = UDim2.new(0, boxSize, 0, boxSize)
-					box.Position = UDim2.new(0, screenPos.X - boxSize / 2, 0, screenPos.Y - boxSize / 2)
-					screenGui.Enabled = true
-				else
-					espBoxes[player.UserId].Enabled = false
-				end
-			end
-		end
-	end
-	
-	for userId, screenGui in pairs(espBoxes) do
-		if not players:FindFirstChild(tostring(userId)) then
-			removeBox(userId)
-		end
-	end
-end
-
-players.PlayerRemoving:Connect(function(player)
-	removeBox(player.UserId)
-end)
 
 local BoxESPToggle = ESPTab:CreateToggle({
 	Name = "Box ESP",
@@ -103,19 +61,41 @@ local BoxESPToggle = ESPTab:CreateToggle({
 	Flag = "BoxESP",
 	Callback = function(Value)
 		boxESPActive = Value
-		if not boxESPActive then
-			for userId, _ in pairs(espBoxes) do
-				removeBox(userId)
+		esplib.box.enabled = Value
+		esplib.name.enabled = Value
+		esplib.distance.enabled = Value
+		
+		if boxESPActive then
+			for _, player in pairs(players:GetPlayers()) do
+				addPlayerESP(player)
 			end
 		end
 	end,
 })
 
-task.spawn(function()
-	while true do
+players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function()
 		if boxESPActive then
-			updateBoxes()
+			addPlayerESP(player)
 		end
+	end)
+	
+	if player.Character and boxESPActive then
+		addPlayerESP(player)
+	end
+end)
+
+players.PlayerRemoving:Connect(function(player)
+	removePlayerESP(player)
+end)
+
+task.spawn(function()
+	local hue = 0
+	while true do
+		esplib.box.fill = getRainbowColor(hue)
+		esplib.name.fill = getRainbowColor(hue)
+		esplib.distance.fill = getRainbowColor(hue)
+		hue = hue + 0.002
 		wait(0.016)
 	end
 end)
@@ -153,6 +133,7 @@ local SettingsTab = Window:CreateTab("Settings", 0)
 local DestroyButton = SettingsTab:CreateButton({
 	Name = "Destroy Menu",
 	Callback = function()
+		getgenv().esplib = nil
 		Rayfield:Destroy()
 	end,
 })
