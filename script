@@ -19,102 +19,13 @@ local Window = Rayfield:CreateWindow({
 
 local MainTab = Window:CreateTab("Main", 0)
 
-local espActive = false
+local espActive = true
 local bindedActive = false
 local currentBind = Enum.KeyCode.E
 local bindPressed = false
-local boxESPRunning = false
 local espBoxes = {}
 
 local ESPSection = MainTab:CreateSection("ESP")
-
-local function createBox(name)
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ESPBox_" .. name
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = game:GetService("CoreGui")
-	
-	local box = Instance.new("Frame")
-	box.Name = "Box"
-	box.BackgroundTransparency = 1
-	box.BorderColor3 = Color3.fromRGB(255, 0, 0)
-	box.BorderSizePixel = 2
-	box.Parent = screenGui
-	
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Name = "NameLabel"
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-	nameLabel.TextSize = 14
-	nameLabel.Text = name
-	nameLabel.Parent = box
-	
-	return screenGui, box, nameLabel
-end
-
-local function startBoxESP()
-	local players = game:GetService("Players")
-	local camera = workspace.CurrentCamera
-	local inputService = game:GetService("UserInputService")
-	
-	inputService.InputBegan:Connect(function(input, gameProcessed)
-		if input.KeyCode == currentBind and not gameProcessed then
-			bindPressed = not bindPressed
-		end
-	end)
-	
-	task.spawn(function()
-		while boxESPRunning and espActive do
-			local shouldShow = true
-			if bindedActive then
-				shouldShow = bindPressed
-			end
-			
-			for _, player in pairs(players:GetPlayers()) do
-				if player ~= players.LocalPlayer and player.Character then
-					local character = player.Character
-					local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-					
-					if humanoidRootPart then
-						local displayName = player.DisplayName or player.Name
-						
-						if not espBoxes[player.UserId] then
-							espBoxes[player.UserId] = createBox(displayName)
-						end
-						
-						local screenGui, box, nameLabel = espBoxes[player.UserId]
-						
-						if shouldShow then
-							screenGui.Enabled = true
-							local screenPos, onScreen = camera:WorldToScreenPoint(humanoidRootPart.Position)
-							
-							if onScreen then
-								local size = (camera.Focus.Position - humanoidRootPart.Position).Magnitude
-								local boxSize = math.max(40, 200 / math.max(size / 10, 0.1))
-								
-								box.Size = UDim2.new(0, boxSize, 0, boxSize)
-								box.Position = UDim2.new(0, screenPos.X - boxSize / 2, 0, screenPos.Y - boxSize / 2)
-								nameLabel.Position = UDim2.new(0, 0, 0, -20)
-								nameLabel.Size = UDim2.new(1, 0, 0, 20)
-							end
-						else
-							screenGui.Enabled = false
-						end
-					end
-				end
-			end
-			
-			for userId, _ in pairs(espBoxes) do
-				if not players:FindFirstChild(tostring(userId)) then
-					espBoxes[userId][1]:Destroy()
-					espBoxes[userId] = nil
-				end
-			end
-			
-			wait(0.016)
-		end
-	end)
-end
 
 local BoxESPToggle = MainTab:CreateToggle({
 	Name = "Box ESP",
@@ -123,14 +34,10 @@ local BoxESPToggle = MainTab:CreateToggle({
 	Callback = function(Value)
 		espActive = Value
 		if not espActive then
-			boxESPRunning = false
-			for _, box in pairs(espBoxes) do
-				box[1]:Destroy()
+			for userId, boxData in pairs(espBoxes) do
+				boxData:Destroy()
 			end
 			espBoxes = {}
-		else
-			boxESPRunning = true
-			startBoxESP()
 		end
 	end,
 })
@@ -161,20 +68,91 @@ local BindButton = MainTab:CreateButton({
 				currentBind = input.KeyCode
 				BindButton:Set("Bind: " .. tostring(currentBind):gsub("Enum.KeyCode.", ""))
 				connection:Disconnect()
-				Rayfield:Notify({
-					Title = "Bind",
-					Content = "Bind set to " .. tostring(currentBind):gsub("Enum.KeyCode.", ""),
-					Duration = 2,
-				})
 			end
 		end)
 	end,
 })
 
-if espActive then
-	boxESPRunning = true
-	startBoxESP()
-end
+local inputService = game:GetService("UserInputService")
+inputService.InputBegan:Connect(function(input, gameProcessed)
+	if input.KeyCode == currentBind and not gameProcessed then
+		bindPressed = not bindPressed
+	end
+end)
+
+task.spawn(function()
+	while true do
+		if espActive then
+			local players = game:GetService("Players")
+			local camera = workspace.CurrentCamera
+			
+			local shouldDraw = true
+			if bindedActive then
+				shouldDraw = bindPressed
+			end
+			
+			for _, player in pairs(players:GetPlayers()) do
+				if player ~= players.LocalPlayer and player.Character then
+					local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						local displayName = player.DisplayName or player.Name
+						
+						if not espBoxes[player.UserId] then
+							local screenGui = Instance.new("ScreenGui")
+							screenGui.Name = "ESPBox_" .. player.UserId
+							screenGui.ResetOnSpawn = false
+							screenGui.Parent = game:GetService("CoreGui")
+							
+							local box = Instance.new("Frame")
+							box.Name = "Box"
+							box.BackgroundTransparency = 1
+							box.BorderColor3 = Color3.fromRGB(255, 0, 0)
+							box.BorderSizePixel = 2
+							box.Parent = screenGui
+							
+							local nameLabel = Instance.new("TextLabel")
+							nameLabel.Name = "NameLabel"
+							nameLabel.BackgroundTransparency = 1
+							nameLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+							nameLabel.TextSize = 14
+							nameLabel.Text = displayName
+							nameLabel.Parent = box
+							nameLabel.Position = UDim2.new(0, 0, 0, -20)
+							nameLabel.Size = UDim2.new(1, 0, 0, 20)
+							
+							espBoxes[player.UserId] = screenGui
+						end
+						
+						local screenGui = espBoxes[player.UserId]
+						screenGui.Enabled = shouldDraw
+						
+						if shouldDraw then
+							local screenPos, onScreen = camera:WorldToScreenPoint(hrp.Position)
+							
+							if onScreen then
+								local distance = (camera.Focus.Position - hrp.Position).Magnitude
+								local boxSize = math.max(40, 200 / math.max(distance / 10, 0.1))
+								
+								local box = screenGui:FindFirstChild("Box")
+								box.Size = UDim2.new(0, boxSize, 0, boxSize)
+								box.Position = UDim2.new(0, screenPos.X - boxSize / 2, 0, screenPos.Y - boxSize / 2)
+							end
+						end
+					end
+				end
+			end
+			
+			for userId, screenGui in pairs(espBoxes) do
+				if not players:FindFirstChild(tostring(userId)) then
+					screenGui:Destroy()
+					espBoxes[userId] = nil
+				end
+			end
+		end
+		
+		wait(0.016)
+	end
+end)
 
 local Toggle = MainTab:CreateToggle({
 	Name = "Test Toggle",
