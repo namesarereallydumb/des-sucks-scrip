@@ -1,0 +1,234 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "des SUCKS LOL",
+	LoadingTitle = "hey buddy how u doing",
+	LoadingSubtitle = "by K",
+	ConfigurationSaving = {
+		Enabled = false,
+		FolderName = nil,
+		FileName = "Config"
+	},
+	Discord = {
+		Enabled = false,
+		Invite = "noinvitelink",
+		RememberJoins = true
+	},
+	KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Main", 0)
+
+local espActive = false
+local bindedActive = false
+local currentBind = Enum.KeyCode.E
+local bindPressed = false
+local boxESPRunning = false
+local espBoxes = {}
+
+local ESPSection = MainTab:CreateSection("ESP")
+
+local function createBox(name)
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "ESPBox_" .. name
+	screenGui.ResetOnSpawn = false
+	screenGui.Parent = game:GetService("CoreGui")
+	
+	local box = Instance.new("Frame")
+	box.Name = "Box"
+	box.BackgroundTransparency = 1
+	box.BorderColor3 = Color3.fromRGB(255, 0, 0)
+	box.BorderSizePixel = 2
+	box.Parent = screenGui
+	
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "NameLabel"
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+	nameLabel.TextSize = 14
+	nameLabel.Text = name
+	nameLabel.Parent = box
+	
+	return screenGui, box, nameLabel
+end
+
+local function startBoxESP()
+	local players = game:GetService("Players")
+	local camera = workspace.CurrentCamera
+	local inputService = game:GetService("UserInputService")
+	
+	inputService.InputBegan:Connect(function(input, gameProcessed)
+		if input.KeyCode == currentBind and not gameProcessed then
+			bindPressed = not bindPressed
+		end
+	end)
+	
+	task.spawn(function()
+		while boxESPRunning and espActive do
+			local shouldShow = true
+			if bindedActive then
+				shouldShow = bindPressed
+			end
+			
+			for _, player in pairs(players:GetPlayers()) do
+				if player ~= players.LocalPlayer and player.Character then
+					local character = player.Character
+					local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+					
+					if humanoidRootPart then
+						local displayName = player.DisplayName or player.Name
+						
+						if not espBoxes[player.UserId] then
+							espBoxes[player.UserId] = createBox(displayName)
+						end
+						
+						local screenGui, box, nameLabel = espBoxes[player.UserId]
+						
+						if shouldShow then
+							screenGui.Enabled = true
+							local screenPos, onScreen = camera:WorldToScreenPoint(humanoidRootPart.Position)
+							
+							if onScreen then
+								local size = (camera.Focus.Position - humanoidRootPart.Position).Magnitude
+								local boxSize = math.max(40, 200 / math.max(size / 10, 0.1))
+								
+								box.Size = UDim2.new(0, boxSize, 0, boxSize)
+								box.Position = UDim2.new(0, screenPos.X - boxSize / 2, 0, screenPos.Y - boxSize / 2)
+								nameLabel.Position = UDim2.new(0, 0, 0, -20)
+								nameLabel.Size = UDim2.new(1, 0, 0, 20)
+							end
+						else
+							screenGui.Enabled = false
+						end
+					end
+				end
+			end
+			
+			for userId, _ in pairs(espBoxes) do
+				if not players:FindFirstChild(tostring(userId)) then
+					espBoxes[userId][1]:Destroy()
+					espBoxes[userId] = nil
+				end
+			end
+			
+			wait(0.016)
+		end
+	end)
+end
+
+local BoxESPToggle = MainTab:CreateToggle({
+	Name = "Box ESP",
+	CurrentValue = true,
+	Flag = "BoxESP",
+	Callback = function(Value)
+		espActive = Value
+		if not espActive then
+			boxESPRunning = false
+			for _, box in pairs(espBoxes) do
+				box[1]:Destroy()
+			end
+			espBoxes = {}
+		else
+			boxESPRunning = true
+			startBoxESP()
+		end
+	end,
+})
+
+local BindedToggle = MainTab:CreateToggle({
+	Name = "Binded",
+	CurrentValue = false,
+	Flag = "Binded",
+	Callback = function(Value)
+		bindedActive = Value
+	end,
+})
+
+local BindButton = MainTab:CreateButton({
+	Name = "Bind: E",
+	Callback = function()
+		Rayfield:Notify({
+			Title = "Bind",
+			Content = "Press any key to bind...",
+			Duration = 2,
+		})
+		
+		local inputService = game:GetService("UserInputService")
+		local connection
+		connection = inputService.InputBegan:Connect(function(input, gameProcessed)
+			if gameProcessed then return end
+			if input.UserInputType == Enum.UserInputType.Keyboard then
+				currentBind = input.KeyCode
+				BindButton:Set("Bind: " .. tostring(currentBind):gsub("Enum.KeyCode.", ""))
+				connection:Disconnect()
+				Rayfield:Notify({
+					Title = "Bind",
+					Content = "Bind set to " .. tostring(currentBind):gsub("Enum.KeyCode.", ""),
+					Duration = 2,
+				})
+			end
+		end)
+	end,
+})
+
+if espActive then
+	boxESPRunning = true
+	startBoxESP()
+end
+
+local Toggle = MainTab:CreateToggle({
+	Name = "Test Toggle",
+	CurrentValue = false,
+	Flag = "Toggle1",
+	Callback = function(Value)
+	end,
+})
+
+local RandomTab = Window:CreateTab("Random Stuff", 0)
+
+local afkSpamActive = false
+local afkSpamLoop = nil
+
+local AFKSpamToggle = RandomTab:CreateToggle({
+	Name = "AFK Spam",
+	CurrentValue = false,
+	Flag = "AFKSpam",
+	Callback = function(Value)
+		afkSpamActive = Value
+		
+		if afkSpamActive then
+			afkSpamLoop = task.spawn(function()
+				local Event = game:GetService("ReplicatedStorage").AFKStateChanged
+				local delay_time = 0.0000001
+				
+				while afkSpamActive do
+					Event:FireServer(true)
+					wait(delay_time)
+					Event:FireServer(false)
+					wait(delay_time)
+				end
+			end)
+		end
+	end,
+})
+
+local SettingsTab = Window:CreateTab("Settings", 0)
+
+local DestroyButton = SettingsTab:CreateButton({
+	Name = "Destroy Menu",
+	Callback = function()
+		Rayfield:Destroy()
+	end,
+})
+
+local DiscordButton = SettingsTab:CreateButton({
+	Name = "Discord",
+	Callback = function()
+		setclipboard("https://discord.gg/WUjpfNuwkq")
+		Rayfield:Notify({
+			Title = "Copied",
+			Content = "Invite copied to your clipboard!",
+			Duration = 3,
+		})
+	end,
+})
